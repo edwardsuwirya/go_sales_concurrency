@@ -18,14 +18,22 @@ type salesData struct {
 	sales      int
 }
 
-func salesCaluction(fileName string) {
+func salesCaluction(wg *sync.WaitGroup, fileName string) {
+	jobs := make(chan salesData)
 	file, err := os.Open(fileName)
 	if err != nil {
 		panic(err)
 	}
 	defer file.Close()
+	go func() {
+		var totalSales int
+		for s := range jobs {
+			totalSales = totalSales + s.sales
+		}
+		fmt.Println(fileName, totalSales)
+		wg.Done()
+	}()
 	scanner := bufio.NewScanner(file)
-	var listSales []salesData
 	for scanner.Scan() {
 		str := scanner.Text()
 		split := strings.Split(str, ",")
@@ -35,18 +43,14 @@ func salesCaluction(fileName string) {
 			outletCode,
 			sales,
 		}
-		listSales = append(listSales, data)
+		jobs <- data
 	}
+	close(jobs)
 
 	if err := scanner.Err(); err != nil {
 		panic(err)
 	}
 
-	var totalSales int
-	for _, s := range listSales {
-		totalSales = totalSales + s.sales
-	}
-	fmt.Println(fileName, totalSales)
 }
 func main() {
 	startTime := time.Now()
@@ -55,12 +59,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
 	var wg sync.WaitGroup
 	for _, f := range files {
 		wg.Add(1)
 		go func(f fs.FileInfo) {
-			defer wg.Done()
-			salesCaluction(filepath.Join(workDir, f.Name()))
+			salesCaluction(&wg, filepath.Join(workDir, f.Name()))
 		}(f)
 	}
 	wg.Wait()
