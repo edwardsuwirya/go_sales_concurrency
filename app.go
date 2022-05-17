@@ -18,8 +18,17 @@ type salesData struct {
 	sales      int
 }
 
-func salesCaluction(fileName string) {
-	file, err := os.Open(fileName)
+var workDir = "/Users/edwardsuwirya/Desktop/sample_data"
+
+func salesDataFileList() []fs.FileInfo {
+	files, err := ioutil.ReadDir(workDir)
+	if err != nil {
+		panic(err)
+	}
+	return files
+}
+func readSalesData(fileName string) []salesData {
+	file, err := os.Open(filepath.Join(workDir, fileName))
 	if err != nil {
 		panic(err)
 	}
@@ -37,34 +46,40 @@ func salesCaluction(fileName string) {
 		}
 		listSales = append(listSales, data)
 	}
-
 	if err := scanner.Err(); err != nil {
 		panic(err)
 	}
-
+	return listSales
+}
+func calculateSales(fileName string) int {
 	var totalSales int
-	for _, s := range listSales {
+	for _, s := range readSalesData(fileName) {
 		totalSales = totalSales + s.sales
 	}
-	fmt.Println(fileName, totalSales)
+	return totalSales
 }
-func main() {
-	startTime := time.Now()
-	workDir := "/Users/edwardsuwirya/Desktop/sample_data"
-	files, err := ioutil.ReadDir(workDir)
-	if err != nil {
-		panic(err)
+func serialCalculation() {
+	for _, f := range salesDataFileList() {
+		calculateSales(f.Name())
+		//fmt.Println(f.Name(), totalSales)
 	}
+}
+func concurrentCalculation() {
 	var wg sync.WaitGroup
-	for _, f := range files {
+	for _, f := range salesDataFileList() {
 		wg.Add(1)
 		go func(f fs.FileInfo) {
 			defer wg.Done()
-			salesCaluction(filepath.Join(workDir, f.Name()))
+			calculateSales(f.Name())
+			//fmt.Println(f.Name(), totalSales)
 		}(f)
 	}
 	wg.Wait()
-
+}
+func main() {
+	startTime := time.Now()
+	concurrentCalculation()
+	//serialCalculation()
 	diff := time.Now().Sub(startTime)
 	fmt.Printf("Took: %f seconds\n", diff.Seconds())
 
