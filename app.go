@@ -60,12 +60,14 @@ func calculateSales(fileName string) int {
 	}
 	return totalSales
 }
+
 func serialCalculation() {
 	for _, f := range salesDataFileList() {
 		calculateSales(f.Name())
 		//fmt.Println(f.Name(), totalSales)
 	}
 }
+
 func concurrentCalculation() {
 	var wg sync.WaitGroup
 	for _, f := range salesDataFileList() {
@@ -81,14 +83,18 @@ func concurrentCalculation() {
 
 func channelCalculation() {
 	var wg sync.WaitGroup
+	jobs := make(chan salesData)
 	for _, f := range salesDataFileList() {
 		wg.Add(1)
 		go func(f fs.FileInfo) {
-			readSalesDataChannel(&wg, f.Name())
+			readSalesDataChannel(&wg, f.Name(), jobs)
 			//fmt.Println(f.Name(), totalSales)
 		}(f)
 	}
-	wg.Wait()
+	go func() {
+		wg.Wait()
+		close(jobs)
+	}()
 }
 
 func calculateSalesChannel(wg *sync.WaitGroup, jobs chan salesData) {
@@ -99,8 +105,8 @@ func calculateSalesChannel(wg *sync.WaitGroup, jobs chan salesData) {
 	//fmt.Println(fileName, totalSales)
 	wg.Done()
 }
-func readSalesDataChannel(wg *sync.WaitGroup, fileName string) {
-	jobs := make(chan salesData)
+
+func readSalesDataChannel(wg *sync.WaitGroup, fileName string, jobs chan salesData) {
 	file, err := os.Open(filepath.Join(workDir, fileName))
 	if err != nil {
 		panic(err)
@@ -120,7 +126,6 @@ func readSalesDataChannel(wg *sync.WaitGroup, fileName string) {
 		}
 		jobs <- data
 	}
-	close(jobs)
 
 	if err := scanner.Err(); err != nil {
 		panic(err)
