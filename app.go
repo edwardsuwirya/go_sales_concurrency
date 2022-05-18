@@ -60,6 +60,24 @@ func calculateSales(fileName string) int {
 	}
 	return totalSales
 }
+func serialCalculation() {
+	for _, f := range salesDataFileList() {
+		calculateSales(f.Name())
+		//fmt.Println(f.Name(), totalSales)
+	}
+}
+func concurrentCalculation() {
+	var wg sync.WaitGroup
+	for _, f := range salesDataFileList() {
+		wg.Add(1)
+		go func(f fs.FileInfo) {
+			defer wg.Done()
+			calculateSales(f.Name())
+			//fmt.Println(f.Name(), totalSales)
+		}(f)
+	}
+	wg.Wait()
+}
 
 func channelCalculation() {
 	var wg sync.WaitGroup
