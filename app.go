@@ -82,37 +82,40 @@ func concurrentCalculation() {
 }
 
 func channelCalculation() {
-	var wg sync.WaitGroup
-	jobs := make(chan salesData)
-	for _, f := range salesDataFileList() {
-		wg.Add(1)
-		go func(f fs.FileInfo) {
-			readSalesDataChannel(&wg, f.Name(), jobs)
-			//fmt.Println(f.Name(), totalSales)
-		}(f)
+	fileList := salesDataFileList()
+	lenFileList := len(fileList)
+
+	var results []chan string
+	var jobs []chan salesData
+	for i := 0; i < lenFileList; i++ {
+		results = append(results, make(chan string))
+		jobs = append(jobs, make(chan salesData))
 	}
-	go func() {
-		wg.Wait()
-		close(jobs)
-	}()
+
+	for i, f := range fileList {
+		go calculateSalesChannel(jobs[i], results[i])
+		go readSalesDataChannel(f.Name(), jobs[i])
+	}
+	for _, r := range results {
+		//fmt.Println(<-r)
+		<-r
+	}
 }
 
-func calculateSalesChannel(wg *sync.WaitGroup, jobs chan salesData) {
+func calculateSalesChannel(jobs chan salesData, result chan string) {
 	var totalSales int
 	for s := range jobs {
 		totalSales = totalSales + s.sales
 	}
-	//fmt.Println(fileName, totalSales)
-	wg.Done()
+	result <- fmt.Sprintf("%d", totalSales)
 }
 
-func readSalesDataChannel(wg *sync.WaitGroup, fileName string, jobs chan salesData) {
+func readSalesDataChannel(fileName string, jobs chan salesData) {
 	file, err := os.Open(filepath.Join(workDir, fileName))
 	if err != nil {
 		panic(err)
 	}
 	defer file.Close()
-	go calculateSalesChannel(wg, jobs)
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -130,6 +133,7 @@ func readSalesDataChannel(wg *sync.WaitGroup, fileName string, jobs chan salesDa
 	if err := scanner.Err(); err != nil {
 		panic(err)
 	}
+	close(jobs)
 }
 func main() {
 	startTime := time.Now()
