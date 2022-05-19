@@ -81,6 +81,26 @@ func concurrentCalculation() {
 	wg.Wait()
 }
 
+// go run -race app.go untuk mendeteksi apakah akan terjadi race condition
+func concurrentMutexCalculation() {
+	var wg sync.WaitGroup
+	var grandTotalSales int
+	var mtx sync.Mutex
+	for _, f := range salesDataFileList() {
+		wg.Add(1)
+		go func(f fs.FileInfo) {
+			defer wg.Done()
+			res := calculateSales(f.Name())
+			mtx.Lock()
+			grandTotalSales = grandTotalSales + res
+			mtx.Unlock()
+			//fmt.Println(f.Name(), totalSales)
+		}(f)
+	}
+	wg.Wait()
+	fmt.Println(grandTotalSales)
+}
+
 func channelCalculation() {
 	fileList := salesDataFileList()
 	lenFileList := len(fileList)
@@ -137,7 +157,7 @@ func readSalesDataChannel(fileName string, jobs chan salesData) {
 }
 func main() {
 	startTime := time.Now()
-	channelCalculation()
+	concurrentMutexCalculation()
 	diff := time.Now().Sub(startTime)
 	fmt.Printf("Took: %f seconds\n", diff.Seconds())
 
