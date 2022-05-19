@@ -101,6 +101,26 @@ func concurrentMutexCalculation() {
 	fmt.Println(grandTotalSales)
 }
 
+func channelTotalCalculation() {
+	fileList := salesDataFileList()
+	results := make(chan string)
+	jobs := make(chan salesData)
+	var wg sync.WaitGroup
+	go calculateSalesChannel(jobs, results)
+	for _, f := range fileList {
+		wg.Add(1)
+		go func(fi fs.FileInfo) {
+			defer wg.Done()
+			readSalesDataChannel(fi.Name(), jobs)
+		}(f)
+	}
+	go func() {
+		wg.Wait()
+		close(jobs)
+	}()
+	fmt.Println(<-results)
+}
+
 func channelCalculation() {
 	fileList := salesDataFileList()
 	lenFileList := len(fileList)
@@ -153,11 +173,10 @@ func readSalesDataChannel(fileName string, jobs chan salesData) {
 	if err := scanner.Err(); err != nil {
 		panic(err)
 	}
-	close(jobs)
 }
 func main() {
 	startTime := time.Now()
-	concurrentMutexCalculation()
+	channelTotalCalculation()
 	diff := time.Now().Sub(startTime)
 	fmt.Printf("Took: %f seconds\n", diff.Seconds())
 
